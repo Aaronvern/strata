@@ -1,5 +1,20 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { buildServer } from '../../src/api/server.js';
+import { makeHealth } from '../../src/monitor/health.js';
+import { makeMetrics } from '../../src/monitor/metrics.js';
+
+const WALLET = '0x2222222222222222222222222222222222222222';
+
+function approvedOrchestrator() {
+  return {
+    runGateCycle: vi.fn(async () => ({
+      status: 'approved' as const,
+      receipt: { permittedTranchesMask: 4, kycExpiresAtSec: 123, sanctionsScreenExpiresAtSec: 456 },
+      receiptCid: 'QmReceipt',
+      evidenceCid: 'QmEvidence'
+    }))
+  } as never;
+}
 
 function mockDeps(gateResult: any) {
   return {
@@ -135,6 +150,99 @@ describe('GET /metrics', () => {
     expect(res.statusCode).toBe(200);
     expect(res.headers['content-type']).toBe('text/plain');
 
+    await app.close();
+  });
+});
+
+describe('compliance server', () => {
+  it('accepts a reclaim credentialProof and returns approved', async () => {
+    const app = await buildServer({
+      orchestrator: approvedOrchestrator(),
+      health: makeHealth(),
+      metrics: makeMetrics(),
+      reclaimConfigProvider: async () => '{"json":"config"}'
+    });
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/v1/compliance/check',
+      payload: {
+        wallet: WALLET,
+        credentialProof: { kind: 'reclaim', proofs: [{ identifier: '0x' + 'ab'.repeat(32) }] },
+        depositorAuthSignature: '0xabcd',
+        deadline: 2_000_000_000
+      }
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().status).toBe('approved');
+    await app.close();
+  });
+
+  it('serves a reclaim config for a valid wallet', async () => {
+    const app = await buildServer({
+      orchestrator: approvedOrchestrator(),
+      health: makeHealth(),
+      metrics: makeMetrics(),
+      reclaimConfigProvider: async () => '{"json":"config"}'
+    });
+    const res = await app.inject({ method: 'GET', url: `/api/v1/compliance/reclaim/config?wallet=${WALLET}` });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().reclaimConfig).toBe('{"json":"config"}');
+    await app.close();
+  });
+
+  it('reclaim config 400 on missing wallet', async () => {
+    const app = await buildServer({
+      orchestrator: approvedOrchestrator(),
+      health: makeHealth(),
+      metrics: makeMetrics(),
+      reclaimConfigProvider: async () => 'x'
+    });
+    const res = await app.inject({ method: 'GET', url: '/api/v1/compliance/reclaim/config' });
+    expect(res.statusCode).toBe(400);
+    await app.close();
+  });
+
+  it('reclaim config 404 when provider disabled', async () => {
+    const app = await buildServer({
+      orchestrator: approvedOrchestrator(),
+      health: makeHealth(),
+      metrics: makeMetrics()
+    });
+    const res = await app.inject({ method: 'GET', url: `/api/v1/compliance/reclaim/config?wallet=${WALLET}` });
+    expect(res.statusCode).toBe(404);
+    await app.close();
+  });
+
+  it('reclaim config 500 when provider throws', async () => {
+    const app = await buildServer({
+      orchestrator: approvedOrchestrator(),
+      health: makeHealth(),
+      metrics: makeMetrics(),
+      reclaimConfigProvider: async () => { throw new Error('boom'); }
+    });
+    const res = await app.inject({ method: 'GET', url: `/api/v1/compliance/reclaim/config?wallet=${WALLET}` });
+    expect(res.statusCode).toBe(500);
+    await app.close();
+  });
+
+  it('rejects a malformed reclaim credentialProof (no proofs) with 400', async () => {
+    const app = await buildServer({
+      orchestrator: approvedOrchestrator(),
+      health: makeHealth(),
+      metrics: makeMetrics(),
+      reclaimConfigProvider: async () => '{"json":"config"}'
+    });
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/v1/compliance/check',
+      payload: {
+        wallet: WALLET,
+        credentialProof: { kind: 'reclaim' },
+        depositorAuthSignature: '0xabcd',
+        deadline: 2_000_000_000
+      }
+    });
+    expect(res.statusCode).toBe(400);
     await app.close();
   });
 });

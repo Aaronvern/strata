@@ -9,17 +9,28 @@ import type { ComplianceMetrics } from '../monitor/metrics.js';
 const Address = z.string().regex(/^0x[a-fA-F0-9]{40}$/);
 const HexString = z.string().regex(/^0x[a-fA-F0-9]+$/);
 
+const StubCredentialProofSchema = z.object({
+  kind: z.literal('stub').optional(),
+  issuer: Address,
+  wallet: Address,
+  kycTier: z.enum(['none', 'basic', 'enhanced']),
+  jurisdictionCode: z.string().min(1),
+  issuedAtSec: z.number().int().positive(),
+  expiresAtSec: z.number().int().positive(),
+  signature: HexString
+});
+
+const ReclaimCredentialProofSchema = z.object({
+  kind: z.literal('reclaim'),
+  proofs: z.union([z.array(z.record(z.any())), z.record(z.any())]),
+  providerVersion: z.string().optional()
+});
+
+const CredentialProofInputSchema = z.union([ReclaimCredentialProofSchema, StubCredentialProofSchema]);
+
 const CheckRequestSchema = z.object({
   wallet: Address,
-  credentialProof: z.object({
-    issuer: Address,
-    wallet: Address,
-    kycTier: z.enum(['none', 'basic', 'enhanced']),
-    jurisdictionCode: z.string().min(1),
-    issuedAtSec: z.number().int().positive(),
-    expiresAtSec: z.number().int().positive(),
-    signature: HexString
-  }),
+  credentialProof: CredentialProofInputSchema,
   depositorAuthSignature: HexString,
   deadline: z.number().int().positive()
 });
@@ -28,6 +39,7 @@ export interface ServerDeps {
   orchestrator: GateOrchestrator;
   health: HealthState;
   metrics: ComplianceMetrics;
+  reclaimConfigProvider?: (wallet: `0x${string}`) => Promise<string>;
 }
 
 export async function buildServer(deps: ServerDeps) {
@@ -89,6 +101,22 @@ export async function buildServer(deps: ServerDeps) {
     } catch (err) {
       deps.metrics.verificationFailures.inc();
       return reply.status(500).send({ error: 'internal_error' });
+    }
+  });
+
+  app.get('/api/v1/compliance/reclaim/config', async (request, reply) => {
+    const wallet = (request.query as { wallet?: string })?.wallet;
+    if (!wallet || !/^0x[a-fA-F0-9]{40}$/.test(wallet)) {
+      return reply.status(400).send({ error: 'invalid_wallet' });
+    }
+    if (!deps.reclaimConfigProvider) {
+      return reply.status(404).send({ error: 'reclaim_not_enabled' });
+    }
+    try {
+      const reclaimConfig = await deps.reclaimConfigProvider(wallet as `0x${string}`);
+      return reply.status(200).send({ reclaimConfig });
+    } catch {
+      return reply.status(500).send({ error: 'reclaim_config_failed' });
     }
   });
 

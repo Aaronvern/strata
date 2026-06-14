@@ -8,13 +8,14 @@
 import { useAccount } from 'wagmi';
 import { useComplianceReceipt } from '@/hooks/useComplianceReceipt';
 import { DepositGate } from './DepositGate';
+import { ReclaimVerify } from './ReclaimVerify';
 import { isDemoDepositsEnabled } from '@/lib/demoDeposits';
 
 const DEMO_WALLET = '0x000000000000000000000000000000000000dEaD' as const;
 
 export function DepositView(_props: { initialTier?: string | null }) {
   const { address, isConnected } = useAccount();
-  const { tokenId, loading } = useComplianceReceipt(isConnected ? address : undefined);
+  const { tokenId, loading, refetch } = useComplianceReceipt(isConnected ? address : undefined);
   const whitelisted = tokenId !== null && tokenId > 0n;
   const demoMode = isDemoDepositsEnabled();
 
@@ -112,9 +113,18 @@ export function DepositView(_props: { initialTier?: string | null }) {
           public preview. Watch the dashboard for live agent activity meanwhile.
         </p>
         {isConnected && address && !loading && !whitelisted && (
-          <p className="a-muted mono" style={{ fontSize: 11.5, maxWidth: 460, lineHeight: 1.55, margin: 0 }}>
-            This wallet is not yet whitelisted for the beta deposit. Contact the team to be added.
-          </p>
+          process.env.NEXT_PUBLIC_RECLAIM_ENABLED === '1' ? (
+            <div style={{ width: '100%', marginTop: 8 }}>
+              <p className="a-muted mono" style={{ fontSize: 11.5, maxWidth: 460, lineHeight: 1.55, margin: '0 auto 12px' }}>
+                Reuse your exchange KYC to unlock deposits — no documents, no PII shared.
+              </p>
+              <ReclaimVerify wallet={address} onVerified={() => refetch()} />
+            </div>
+          ) : (
+            <p className="a-muted mono" style={{ fontSize: 11.5, maxWidth: 460, lineHeight: 1.55, margin: 0 }}>
+              This wallet is not yet whitelisted for the beta deposit. Contact the team to be added.
+            </p>
+          )
         )}
         <div style={{ display: 'flex', justifyContent: 'center', gap: 12, marginTop: 10, flexWrap: 'wrap' }}>
           <a href="/app" className="btn-app btn-primary">
