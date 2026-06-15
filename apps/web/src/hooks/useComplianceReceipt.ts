@@ -19,9 +19,13 @@ const REGISTRY_ABI = [
 // "is this wallet whitelisted at all" rather than per-tranche permission; the
 // deposit form lets the user pick their tranche, so we'd otherwise need three
 // isAllowed calls. receiptOf is one read.
-export function useComplianceReceipt(wallet?: `0x${string}`): { tokenId: bigint | null; loading: boolean } {
+export function useComplianceReceipt(wallet?: `0x${string}`): {
+  tokenId: bigint | null;
+  loading: boolean;
+  refetch: () => void;
+} {
   const enabled = !!wallet;
-  const { data, isLoading } = useReadContract({
+  const { data, isLoading, refetch } = useReadContract({
     address: COMPLIANCE_REGISTRY,
     abi: REGISTRY_ABI,
     functionName: 'receiptOf',
@@ -29,7 +33,7 @@ export function useComplianceReceipt(wallet?: `0x${string}`): { tokenId: bigint 
     query: { enabled }
   });
 
-  if (!enabled) return { tokenId: null, loading: false };
-  if (isLoading || data === undefined) return { tokenId: null, loading: true };
-  return { tokenId: data as bigint, loading: false };
+  if (!enabled) return { tokenId: null, loading: false, refetch: () => {} };
+  if (isLoading || data === undefined) return { tokenId: null, loading: true, refetch: () => { void refetch(); } };
+  return { tokenId: data as bigint, loading: false, refetch: () => { void refetch(); } };
 }

@@ -112,6 +112,15 @@ describe('stubCredential adapter', () => {
     expect(result.valid).toBe(false);
   });
 
+  it('rejects a reclaim proof', async () => {
+    const adapter = createStubCredentialAdapter({ now: clock });
+
+    const result = await adapter.verify({ kind: 'reclaim', proofs: [] }, walletA);
+
+    expect(result.valid).toBe(false);
+    expect(result.provider).toBe('stub');
+  });
+
   it('produces a deterministic credentialEvidenceHash for the same signature', async () => {
     const adapter = createStubCredentialAdapter({ now: clock });
     const proof = await signStubCredential(

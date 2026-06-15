@@ -1,16 +1,21 @@
 'use client';
 
+export type WebCredentialProof =
+  | {
+      kind?: 'stub';
+      issuer: string;
+      wallet: string;
+      kycTier: 'none' | 'basic' | 'enhanced';
+      jurisdictionCode: string;
+      issuedAtSec: number;
+      expiresAtSec: number;
+      signature: string;
+    }
+  | { kind: 'reclaim'; proofs: unknown; providerVersion?: string };
+
 export interface ComplianceCheckRequest {
   wallet: string;
-  credentialProof: {
-    issuer: string;
-    wallet: string;
-    kycTier: 'none' | 'basic' | 'enhanced';
-    jurisdictionCode: string;
-    issuedAtSec: number;
-    expiresAtSec: number;
-    signature: string;
-  };
+  credentialProof: WebCredentialProof;
   depositorAuthSignature: string;
   deadline: number;
 }
@@ -58,6 +63,15 @@ export async function checkCompliance(body: ComplianceCheckRequest): Promise<Com
   }
 
   return data as ComplianceApproved | ComplianceExisting;
+}
+
+export async function fetchReclaimConfig(wallet: string): Promise<string> {
+  const res = await fetch(`${GATE_URL}/api/v1/compliance/reclaim/config?wallet=${wallet}`);
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.error ?? `Reclaim config returned ${res.status}`);
+  }
+  return data.reclaimConfig as string;
 }
 
 export function decodeMask(mask: number): { senior: boolean; mezzanine: boolean; junior: boolean } {

@@ -4,7 +4,8 @@ import {
 } from 'viem/accounts';
 import { verifyTypedData, keccak256, encodePacked } from 'viem';
 import type { CredentialResult } from '../types.js';
-import type { CredentialAdapter, CredentialProof } from './credential.js';
+import type { CredentialAdapter, CredentialProof, CredentialProofInput } from './credential.js';
+import { isReclaimProof } from './credential.js';
 
 export const STUB_ISSUER_PRIVATE_KEY =
   '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80' as const;
@@ -88,7 +89,17 @@ export function createStubCredentialAdapter(
   return {
     provider: 'stub' as const,
 
-    async verify(proof: CredentialProof, wallet: `0x${string}`): Promise<CredentialResult> {
+    async verify(proof: CredentialProofInput, wallet: `0x${string}`): Promise<CredentialResult> {
+      if (isReclaimProof(proof)) {
+        return {
+          valid: false,
+          kycTier: 'none',
+          jurisdictionCode: 'none',
+          credentialEvidenceHash: ('0x' + '00'.repeat(32)) as `0x${string}`,
+          issuer: ('0x' + '00'.repeat(20)) as `0x${string}`,
+          provider: 'stub'
+        };
+      }
       if (proof.wallet.toLowerCase() !== wallet.toLowerCase()) {
         return invalidResult(proof);
       }

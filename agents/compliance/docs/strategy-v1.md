@@ -32,7 +32,7 @@ Compliance does not subscribe to `AllocationProposed` or any rebalance event. Th
 
 ## v2 scope
 
-- Real credential adapters (zkPass, Privado ID)
+- Real credential adapters: Reclaim Protocol shipped (see reclaim-adapter.md); zkPass / Privado ID optional
 - Real sanctions oracle (Chainalysis)
 - Safe multisig for policy publishing with quorum signatures
 - AI policy interpreter (reads regulatory text, proposes permission tables, humans approve)

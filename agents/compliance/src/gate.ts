@@ -6,6 +6,8 @@ import { loadConfig } from './config.js';
 import { buildChainClients } from './chain/client.js';
 import { createStubCredentialAdapter } from './adapters/stubCredential.js';
 import { createStubSanctionsOracle } from './adapters/stubSanctions.js';
+import { createReclaimCredentialAdapter } from './adapters/reclaimCredential.js';
+import { getProfile } from './adapters/reclaimProfiles.js';
 import { createStubPolicyResolver, createLivePolicyResolver } from './pipeline/policyResolver.js';
 import { GateOrchestrator } from './pipeline/gateOrchestrator.js';
 import { makePublisher } from './publication/publish.js';
@@ -46,7 +48,15 @@ async function main(): Promise<void> {
   const health = makeHealth();
   const metrics = makeMetrics();
 
-  const credentialAdapter = createStubCredentialAdapter();
+  const credentialAdapter =
+    cfg.credential.provider === 'reclaim'
+      ? createReclaimCredentialAdapter({
+          providerId: cfg.credential.reclaim.providerId,
+          providerVersion: cfg.credential.reclaim.providerVersion,
+          profile: getProfile(cfg.credential.reclaim.profile),
+          maxAgeSec: cfg.credential.reclaim.proofMaxAgeSec
+        })
+      : createStubCredentialAdapter();
   const sanctionsOracle = createStubSanctionsOracle();
   const policyResolver = cfg.compliance.dryRun
     ? createStubPolicyResolver()
@@ -85,7 +95,33 @@ async function main(): Promise<void> {
     })
   });
 
-  const server = await buildServer({ orchestrator, health, metrics });
+  let reclaimConfigProvider: ((wallet: `0x${string}`) => Promise<string>) | undefined;
+  if (cfg.credential.provider === 'reclaim') {
+    const { ReclaimProofRequest } = await import('@reclaimprotocol/js-sdk');
+    reclaimConfigProvider = async (wallet: `0x${string}`) => {
+      const req = await ReclaimProofRequest.init(
+        cfg.credential.reclaim.appId,
+        cfg.credential.reclaim.appSecret,
+        cfg.credential.reclaim.providerId
+      );
+      // Bind the depositor wallet into the signed proof context.
+      req.setContext(wallet, 'Strata deposit compliance');
+      if (cfg.credential.reclaim.callbackBaseUrl) {
+        req.setAppCallbackUrl(
+          `${cfg.credential.reclaim.callbackBaseUrl}/api/v1/compliance/reclaim/callback`,
+          true
+        );
+      }
+      return req.toJsonString();
+    };
+  }
+
+  const server = await buildServer({
+    orchestrator,
+    health,
+    metrics,
+    ...(reclaimConfigProvider ? { reclaimConfigProvider } : {})
+  });
 
   const shutdown = async () => {
     log.info('shutting down');

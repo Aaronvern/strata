@@ -7,7 +7,7 @@ const HexString = z.string().regex(/^0x[a-fA-F0-9]+$/, 'must be 0x-prefixed hex'
 export const KycTier = z.enum(['none', 'basic', 'enhanced']);
 export type KycTier = z.infer<typeof KycTier>;
 
-export const CredentialProvider = z.enum(['zkpass', 'privado', 'stub']);
+export const CredentialProvider = z.enum(['zkpass', 'privado', 'stub', 'reclaim']);
 export type CredentialProvider = z.infer<typeof CredentialProvider>;
 
 // Bitmask: bit 0 = senior, bit 1 = mezzanine, bit 2 = junior

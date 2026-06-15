@@ -70,3 +70,38 @@ describe('loadConfig', () => {
     expect(cfg.compliance.dryRun).toBe(false);
   });
 });
+
+describe('config credential provider', () => {
+  let saved: NodeJS.ProcessEnv;
+  beforeEach(() => { saved = { ...process.env }; });
+  afterEach(() => { process.env = saved; });
+
+  function setEnv(extra: Record<string, string>) {
+    process.env = { ...baseEnv, ...extra } as NodeJS.ProcessEnv;
+  }
+
+  it('defaults to stub', () => {
+    setEnv({});
+    expect(loadConfig().credential.provider).toBe('stub');
+  });
+
+  it('reclaim without app id throws', () => {
+    setEnv({ CREDENTIAL_PROVIDER: 'reclaim' });
+    expect(() => loadConfig()).toThrow(/RECLAIM/);
+  });
+
+  it('reclaim with required vars resolves', () => {
+    setEnv({
+      CREDENTIAL_PROVIDER: 'reclaim',
+      RECLAIM_APP_ID: 'app',
+      RECLAIM_APP_SECRET: 'secret',
+      RECLAIM_PROVIDER_ID: 'prov',
+      RECLAIM_PROFILE: 'exchange-kyc'
+    });
+    const c = loadConfig();
+    expect(c.credential.provider).toBe('reclaim');
+    expect(c.credential.reclaim.providerId).toBe('prov');
+    expect(c.credential.reclaim.profile).toBe('exchange-kyc');
+    expect(c.credential.reclaim.proofMaxAgeSec).toBeGreaterThan(0);
+  });
+});

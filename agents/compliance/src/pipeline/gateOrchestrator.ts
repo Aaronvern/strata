@@ -1,4 +1,4 @@
-import type { CredentialAdapter, CredentialProof } from '../adapters/credential.js';
+import type { CredentialAdapter, CredentialProofInput } from '../adapters/credential.js';
 import type { SanctionsOracle } from '../adapters/sanctions.js';
 import type { PolicyResolver } from './policyResolver.js';
 import { routeTranches } from './trancheRouter.js';
@@ -27,7 +27,7 @@ export class GateOrchestrator {
 
   async runGateCycle(
     wallet: `0x${string}`,
-    credentialProof: CredentialProof,
+    credentialProof: CredentialProofInput,
     depositorAuthSignature: `0x${string}`,
     deadline: number
   ): Promise<GateResult> {

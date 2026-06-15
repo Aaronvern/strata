@@ -17,15 +17,16 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@strata/scout": "workspace:*",
-    "viem": "^2.21.0",
-    "zod": "^3.23.0",
-    "pino": "^9.4.0",
-    "p-retry": "^6.2.0",
-    "prom-client": "^15.1.3",
-    "fastify": "^5.0.0",
     "@fastify/cors": "^10.0.0",
-    "@fastify/rate-limit": "^10.0.0"
+    "@fastify/rate-limit": "^10.0.0",
+    "@reclaimprotocol/js-sdk": "^5.5.0",
+    "@strata/scout": "workspace:*",
+    "fastify": "^5.0.0",
+    "p-retry": "^6.2.0",
+    "pino": "^9.4.0",
+    "prom-client": "^15.1.3",
+    "viem": "^2.21.0",
+    "zod": "^3.23.0"
   },
   "devDependencies": {
     "@types/node": "^22.7.0",
